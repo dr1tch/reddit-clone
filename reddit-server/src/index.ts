@@ -3,16 +3,22 @@ import express from "express";
 import { ApolloServer } from "apollo-server-express";
 import { buildSchema } from "type-graphql";
 import { ApolloServerPluginLandingPageGraphQLPlayground } from "apollo-server-core";
-// import { faker } from "@faker-js/faker";
+import { faker } from "@faker-js/faker";
 // ======================================
 import { __prod__ } from "./constants";
-// import { Post } from "./entities/Post";
+import { Post } from "./entities/Post";
 import microOrmConfig from "./mikro-orm.config";
 import { HelloResolver } from "./resolvers/hello";
 import { PostResolver } from "./resolvers/post";
 const main = async () => {
   const orm = await MikroORM.init(microOrmConfig);
   // await orm.getMigrator().up();
+  // const post = orm.em.create(Post, {
+  //   title: faker.lorem.slug(),
+  //   body: faker.lorem.paragraphs(2, "<br/>\n"),
+  // });
+  // console.log("post", post);
+  // await orm.em.persistAndFlush(post);
   const app = express();
   const apolloServer = new ApolloServer({
     schema: await buildSchema({
@@ -37,9 +43,3 @@ main().catch((e) => console.error(e));
 //   faker.lorem.slug(),
 //   faker.lorem.paragraphs(2, "<br/>\n")
 // );
-//   const post = orm.em.create(Post, {
-//     title: faker.lorem.slug(),
-//     body: faker.lorem.paragraphs(2, "<br/>\n"),
-//   });
-// console.log("post", post);
-// await orm.em.persistAndFlush(post);
