@@ -61,15 +61,43 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
+  @Query(() => User)
+  async current(@Ctx() { em, req }: MyContext): Promise<User | null> {
+    // The user is not logged in
+    if (!req.session.userId) return null;
+    const user = await em.findOne(User, { _id: parseInt(req.session.userId) });
+    return user;
+  }
+
   @Query(() => [User])
   users(@Ctx() { em }: MyContext): Promise<User[]> {
     return em.find(User, {});
   }
-  @Mutation(() => User)
+  @Mutation(() => UserResponse)
   async register(
     @Arg("userDetails") userDetails: RegisterUserInfoInput,
-    @Ctx() { em }: MyContext
-  ): Promise<User> {
+    @Ctx() { em, req }: MyContext
+  ): Promise<UserResponse> {
+    if (userDetails.username.length < 3) {
+      return {
+        errors: [
+          {
+            field: "username",
+            message: "username too short!",
+          },
+        ],
+      };
+    }
+    if (userDetails.password.length < 8) {
+      return {
+        errors: [
+          {
+            message: "Password must be greater than 8 characters!",
+            field: "password",
+          },
+        ],
+      };
+    }
     const password = await argon2.hash(userDetails.password);
 
     const user = em.create(User, {
@@ -79,16 +107,61 @@ export class UserResolver {
       bio: userDetails.bio,
       name: userDetails.name,
     });
-    await em.persistAndFlush(user).catch((e) => console.error(e));
-    return user;
+    try {
+      await em.persistAndFlush(user);
+    } catch (err) {
+      console.error(err);
+      if (err.code === "23505" && err.constraint.includes("username"))
+        return {
+          errors: [
+            {
+              message: "username already exists!",
+              field: "username",
+            },
+          ],
+        };
+      else if (err.code === "23505" && err.constraint.includes("email"))
+        return {
+          errors: [
+            {
+              message: "Email already exists!",
+              field: "email",
+            },
+          ],
+        };
+    }
+    // store the user id in the session
+    // this will set a cookie for the user
+    // Keep the user logged in
+    req.session.userId = user._id.toString();
+    return { user };
   }
   @Mutation(() => UserResponse)
   async login(
     @Arg("userDetails") userDetails: LoginUserInfoInput,
-    @Ctx() { em }: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
+    if (userDetails.username.length < 3) {
+      return {
+        errors: [
+          {
+            field: "username",
+            message: "username too short!",
+          },
+        ],
+      };
+    }
+    if (userDetails.password.length < 8) {
+      return {
+        errors: [
+          {
+            message: "Password must be greater than 8 characters!",
+            field: "password",
+          },
+        ],
+      };
+    }
     const user = await em.findOne(User, {
-      //   email: userDetails.email,
       username: userDetails.username,
     });
     if (!user) {
@@ -106,16 +179,6 @@ export class UserResolver {
       user.password,
       userDetails.password
     );
-    if (userDetails.password.length < 8) {
-      return {
-        errors: [
-          {
-            message: "Password must be greater than 8 characters!",
-            field: "password",
-          },
-        ],
-      };
-    }
     if (!isPasswordValid)
       return {
         errors: [
@@ -125,16 +188,7 @@ export class UserResolver {
           },
         ],
       };
-    // if (isPasswordValid) return user;
-
-    // const password = await argon2.hash(userDetails.password);
-
-    // const user = em.create(User, {
-    //   email: userDetails.email,
-    //   password,
-    //   username: userDetails.username,
-    // });
-    // await em.persistAndFlush(user).catch((e) => console.error(e));
+    req.session.userId = user._id.toString();
     return { user };
   }
 }
