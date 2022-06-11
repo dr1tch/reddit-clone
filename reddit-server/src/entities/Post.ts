@@ -23,9 +23,4 @@ export class Post {
   @Field()
   @Property({ type: "date", onUpdate: () => new Date() })
   updatedAt?: Date = new Date();
-
-  constructor(title: string, body: string) {
-    this.title = title;
-    this.body = body;
-  }
 }
